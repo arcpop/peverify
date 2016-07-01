@@ -115,7 +115,7 @@ BOOL ExtractCertInfo(
 	providerData = WTHelperProvDataFromStateData(StateHandle);
 	if (providerData == NULL)
 	{
-		perror("providerData == NULL\n");
+		printf("providerData == NULL\n");
 		return FALSE;
 	}
 
@@ -136,7 +136,7 @@ BOOL ExtractCertInfo(
 		PCCERT_CONTEXT* signatures = HeapAlloc(GetProcessHeap(), 0, numSignatures * sizeof(PCCERT_CONTEXT));
 		if (signatures == NULL)
 		{
-			perror("signatures == NULL\n");
+			printf("signatures == NULL\n");
 			return FALSE;
 		}
 
@@ -157,7 +157,7 @@ BOOL ExtractCertInfo(
 	}
 	else
 	{
-		perror("No signatures\n");
+		printf("No signatures\n");
 		return FALSE;
 	}
 }
@@ -171,6 +171,7 @@ LONG VerifyTrust(
 	HANDLE* StateDataOut
 )
 {
+	LONG res;
 	WINTRUST_DATA winTrustData = { 0 };
 	winTrustData.cbStruct = sizeof(winTrustData);
 	winTrustData.pPolicyCallbackData = ActionParameter;
@@ -181,8 +182,10 @@ LONG VerifyTrust(
 	winTrustData.pwszURLReference = NULL;
 	winTrustData.dwProvFlags = ProviderFlags | WTD_SAFER_FLAG; //See documentation
 	(LPVOID)winTrustData.pFile = VerifyStruct;
-
-	return WinVerifyTrust(INVALID_HANDLE_VALUE, ActionID, &winTrustData);
+	res = WinVerifyTrust(INVALID_HANDLE_VALUE, ActionID, &winTrustData);
+	*StateDataOut = winTrustData.hWVTStateData;
+	printf("Verify trust: %d -> %d\n", UnionChoice, res);
+	return res;
 }
 
 VOID FreeWVTStateData(
@@ -266,6 +269,7 @@ PWSTR BinaryToHexString(PBYTE BinaryData, DWORD Length)
 		_swprintf(StrOut + (2 * i), L"%.2X", BinaryData[i]);
 	}
 	StrOut[2 * i] = L'\0';
+	printf("%ws\n", StrOut);
 	return StrOut;
 }
 
@@ -361,7 +365,7 @@ BOOL VerifyTrustFromEmbeddedCert(
 	HANDLE *StateDataOut
 )
 {
-	DWORD providerFlags = WTD_USE_DEFAULT_OSVER_CHECK | WTD_DISABLE_MD2_MD4 | WTD_SAFER_FLAG;
+	DWORD providerFlags = WTD_SAFER_FLAG;
 	WINTRUST_FILE_INFO fileInfo = { 0 };
 	fileInfo.cbStruct = sizeof(fileInfo);
 	fileInfo.pcwszFilePath = FilePath;
@@ -408,53 +412,50 @@ BOOL WINAPI VerifyPEFile(
 		return FALSE;
 	}
 	*VerifyResult = TRUST_E_NOSIGNATURE;
-	if (VerifyTrustFromEmbeddedCert(FilePath, fileHandle, TRUE, &winTrustRes, &stateData))
+	winTrustRes = TRUST_E_NOSIGNATURE;
+	stateData = NULL;
+	if (VerifyTrustFromEmbeddedCert(FilePath, fileHandle, FALSE, &winTrustRes, &stateData))
 	{
+		printf("Result is 0x%.8X\n", winTrustRes);
 		*VerifyResult = winTrustRes;
 		if (winTrustRes == 0)
 		{
 			ExtractCertInfo(stateData, SignaturesOut, SignatureCountOut);
 			FreeWVTStateData(stateData, &WinTrustActionGenericVerifyV2);
 			stateData = NULL;
-		}
-		else
-		{
-			perror("Result is 0x%.8X", winTrustRes);
 		}
 		CloseHandle(fileHandle);
 		return TRUE;
 	}
 	if (pfnCryptCATAdminAcquireContext2 && pfnCryptCATAdminCalcHashFromFileHandle2)
 	{
-		if (VerifyTrustFromCatalogCert(FilePath, fileHandle, BCRYPT_SHA256_ALGORITHM, TRUE, &winTrustRes, &stateData))
+		winTrustRes = TRUST_E_NOSIGNATURE;
+		stateData = NULL;
+		if (VerifyTrustFromCatalogCert(FilePath, fileHandle, BCRYPT_SHA256_ALGORITHM, FALSE, &winTrustRes, &stateData))
 		{
+			printf("Result is 0x%.8X\n", winTrustRes);
 			*VerifyResult = winTrustRes;
 			if (winTrustRes == 0)
 			{
 				ExtractCertInfo(stateData, SignaturesOut, SignatureCountOut);
-				FreeWVTStateData(stateData, &WinTrustActionGenericVerifyV2);
+				FreeWVTStateData(stateData, &DriverActionVerify);
 				stateData = NULL;
-			}
-			else
-			{
-				perror("Result is 0x%.8X", winTrustRes);
 			}
 			CloseHandle(fileHandle);
 			return TRUE;
 		}
 	}
+	winTrustRes = TRUST_E_NOSIGNATURE;
+	stateData = NULL;
 	if (VerifyTrustFromCatalogCert(FilePath, fileHandle, NULL, TRUE, &winTrustRes, &stateData))
 	{
+		printf("Result is 0x%.8X\n", winTrustRes);
 		*VerifyResult = winTrustRes;
 		if (winTrustRes == 0)
 		{
 			ExtractCertInfo(stateData, SignaturesOut, SignatureCountOut);
-			FreeWVTStateData(stateData, &WinTrustActionGenericVerifyV2);
+			FreeWVTStateData(stateData, &DriverActionVerify);
 			stateData = NULL;
-		}
-		else
-		{
-			perror("Result is 0x%.8X", winTrustRes);
 		}
 		CloseHandle(fileHandle);
 		return TRUE;

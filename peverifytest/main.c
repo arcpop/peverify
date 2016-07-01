@@ -14,9 +14,9 @@ VOID PrintCertInfo(PCCERT_CONTEXT* Signatures, DWORD SignatureCount)
 	{
 		SubjectBuffer[0] = L'\0';
 		IssuerBuffer[0] = L'\0';
-		CertNameToStrW(Signatures[i]->dwCertEncodingType, &Signatures[i]->pCertInfo->Subject, CERT_OID_NAME_STR, SubjectBuffer, MAX_PATH);
-		CertNameToStrW(Signatures[i]->dwCertEncodingType, &Signatures[i]->pCertInfo->Issuer, CERT_OID_NAME_STR, IssuerBuffer, MAX_PATH);
-		wprintf(L"\t%ws -> %ws\n", SubjectBuffer, IssuerBuffer);
+		CertNameToStrW(Signatures[i]->dwCertEncodingType, &Signatures[i]->pCertInfo->Subject, CERT_X500_NAME_STR, SubjectBuffer, MAX_PATH);
+		CertNameToStrW(Signatures[i]->dwCertEncodingType, &Signatures[i]->pCertInfo->Issuer, CERT_X500_NAME_STR, IssuerBuffer, MAX_PATH);
+		wprintf(L"\t%ws -> %ws\n", IssuerBuffer, SubjectBuffer);
 	}
 }
 
@@ -43,7 +43,7 @@ VOID PrintInfoForProcess(DWORD pid)
 		}
 		else
 		{
-			wprintf("Failed to get module file name of %d\n", pid);
+			wprintf(L"Failed to get module file name of %d\n", pid);
 		}
 		CloseHandle(hProcess);
 	}
