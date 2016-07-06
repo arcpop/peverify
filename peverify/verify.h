@@ -16,4 +16,3 @@ __declspec(dllexport) VOID WINAPI FreeCertInfo(
 	DWORD SignatureCount
 );
 
-BOOL LoadDependencies();

@@ -2,8 +2,19 @@
 #include <tchar.h>
 #include <stdio.h>
 #include <Psapi.h>
+#include <winternl.h>
 
 #pragma comment(lib, "crypt32.lib")
+
+
+NTSTATUS (WINAPI *pfnNtQuerySystemInformation)(
+	_In_      SYSTEM_INFORMATION_CLASS SystemInformationClass,
+	_Inout_   PVOID                    SystemInformation,
+	_In_      ULONG                    SystemInformationLength,
+	_Out_opt_ PULONG                   ReturnLength
+);
+
+
 
 VOID PrintCertInfo(PCCERT_CONTEXT* Signatures, DWORD SignatureCount)
 {
@@ -53,8 +64,46 @@ VOID PrintInfoForProcess(DWORD pid)
 	}
 }
 
+
+VOID PrintInfoForAllProcesses()
+{
+	ULONG ProcessInfoCount = 1024;
+	SYSTEM_PROCESS_INFORMATION* ProcessInfo;
+	ULONG Needed = 0;
+
+	for (
+		ProcessInfo = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ProcessInfoCount * sizeof(SYSTEM_PROCESS_INFORMATION));
+		ProcessInfo != NULL;
+		ProcessInfo = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, ProcessInfo, ProcessInfoCount * sizeof(SYSTEM_PROCESS_INFORMATION))
+		)
+	{
+		Needed = 0;
+		if (0 == pfnNtQuerySystemInformation(
+			SystemProcessInformation,
+			ProcessInfo,
+			sizeof(SYSTEM_PROCESS_INFORMATION) * ProcessInfoCount,
+			&Needed))
+		{
+			break;
+		}
+		ProcessInfoCount = (Needed / sizeof(SYSTEM_PROCESS_INFORMATION)) + 5;
+	}
+	if (ProcessInfo == NULL)
+	{
+		return;
+	}
+	ProcessInfoCount = (Needed / sizeof(SYSTEM_PROCESS_INFORMATION));
+	for (ULONG i = 0; i < ProcessInfoCount; i++)
+	{
+		PrintInfoForProcess((DWORD)ProcessInfo[i].UniqueProcessId);
+	}
+}
+
 int _tmain(int argc, TCHAR* argv[])
 {
+	HMODULE hNtDll = GetModuleHandleW(L"ntdll.dll");
+	pfnNtQuerySystemInformation = (LPVOID)GetProcAddress(hNtDll, "NtQuerySystemInformation");
+
 	if (argc > 1)
 	{
 		DWORD pid = _ttoi(argv[1]);
@@ -62,7 +111,7 @@ int _tmain(int argc, TCHAR* argv[])
 	}
 	else
 	{
-
+		PrintInfoForAllProcesses();
 	}
 }
 

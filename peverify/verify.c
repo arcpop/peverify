@@ -109,7 +109,7 @@ BOOL ExtractCertInfo(
 {
 	PCRYPT_PROVIDER_DATA providerData;
 	PCRYPT_PROVIDER_SGNR signer;
-	ULONG i, numSignatures;
+	ULONG i;
 	*SignaturesOut = NULL;
 	*SignatureCountOut = 0;
 	providerData = WTHelperProvDataFromStateData(StateHandle);
@@ -120,39 +120,30 @@ BOOL ExtractCertInfo(
 	}
 
 	i = 0;
-	numSignatures = 0;
 
 	while (signer = WTHelperGetProvSignerFromChain(providerData, i, FALSE, 0))
 	{
 		if (signer->csCertChain != 0)
 		{
-			numSignatures++;
+			break;
 		}
 		i++;
 	}
-
-	if (numSignatures != 0)
+	if (signer != NULL)
 	{
-		PCCERT_CONTEXT* signatures = HeapAlloc(GetProcessHeap(), 0, numSignatures * sizeof(PCCERT_CONTEXT));
+		PCCERT_CONTEXT* signatures = HeapAlloc(GetProcessHeap(), 0, signer->csCertChain * sizeof(PCCERT_CONTEXT));
 		if (signatures == NULL)
 		{
 			printf("signatures == NULL\n");
 			return FALSE;
 		}
 
-
-		numSignatures = 0;
-		i = 0;
-		while (signer = WTHelperGetProvSignerFromChain(providerData, i, FALSE, 0))
+		for (i = 0; i < signer->csCertChain; i++)
 		{
-			if (signer->csCertChain != 0)
-			{
-				signatures[numSignatures++] = CertDuplicateCertificateContext(signer->pasCertChain[0].pCert);
-			}
-			i++;
+			signatures[i] = CertDuplicateCertificateContext(signer->pasCertChain[i].pCert);
 		}
 		*SignaturesOut = signatures;
-		*SignatureCountOut = numSignatures;
+		*SignatureCountOut = signer->csCertChain;
 		return TRUE;
 	}
 	else
@@ -184,7 +175,7 @@ LONG VerifyTrust(
 	(LPVOID)winTrustData.pFile = VerifyStruct;
 	res = WinVerifyTrust(INVALID_HANDLE_VALUE, ActionID, &winTrustData);
 	*StateDataOut = winTrustData.hWVTStateData;
-	printf("Verify trust: %d -> %d\n", UnionChoice, res);
+	//printf("Verify trust: %d -> %d\n", UnionChoice, res);
 	return res;
 }
 
@@ -269,7 +260,7 @@ PWSTR BinaryToHexString(PBYTE BinaryData, DWORD Length)
 		_swprintf(StrOut + (2 * i), L"%.2X", BinaryData[i]);
 	}
 	StrOut[2 * i] = L'\0';
-	printf("%ws\n", StrOut);
+	//printf("%ws\n", StrOut);
 	return StrOut;
 }
 
