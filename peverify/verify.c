@@ -115,7 +115,6 @@ BOOL ExtractCertInfo(
 	providerData = WTHelperProvDataFromStateData(StateHandle);
 	if (providerData == NULL)
 	{
-		printf("providerData == NULL\n");
 		return FALSE;
 	}
 
@@ -134,7 +133,6 @@ BOOL ExtractCertInfo(
 		PCCERT_CONTEXT* signatures = HeapAlloc(GetProcessHeap(), 0, signer->csCertChain * sizeof(PCCERT_CONTEXT));
 		if (signatures == NULL)
 		{
-			printf("signatures == NULL\n");
 			return FALSE;
 		}
 
@@ -148,7 +146,6 @@ BOOL ExtractCertInfo(
 	}
 	else
 	{
-		printf("No signatures\n");
 		return FALSE;
 	}
 }
@@ -257,7 +254,7 @@ PWSTR BinaryToHexString(PBYTE BinaryData, DWORD Length)
 	}
 	for (; i < Length; i++)
 	{
-		_swprintf(StrOut + (2 * i), L"%.2X", BinaryData[i]);
+		swprintf_s(StrOut + (2 * i), 3, L"%.2X", BinaryData[i]);
 	}
 	StrOut[2 * i] = L'\0';
 	//printf("%ws\n", StrOut);
@@ -378,7 +375,7 @@ BOOL VerifyTrustFromEmbeddedCert(
 	return TRUE;
 }
 
-BOOL WINAPI VerifyPEFile(
+INT WINAPI VerifyPEFile(
 	PCWSTR FilePath,
 	LONG* VerifyResult,
 	PCCERT_CONTEXT** SignaturesOut,
@@ -400,14 +397,13 @@ BOOL WINAPI VerifyPEFile(
 
 	if (fileHandle == INVALID_HANDLE_VALUE)
 	{
-		return FALSE;
+		return -1;
 	}
 	*VerifyResult = TRUST_E_NOSIGNATURE;
 	winTrustRes = TRUST_E_NOSIGNATURE;
 	stateData = NULL;
 	if (VerifyTrustFromEmbeddedCert(FilePath, fileHandle, FALSE, &winTrustRes, &stateData))
 	{
-		printf("Result is 0x%.8X\n", winTrustRes);
 		*VerifyResult = winTrustRes;
 		if (winTrustRes == 0)
 		{
@@ -416,7 +412,7 @@ BOOL WINAPI VerifyPEFile(
 			stateData = NULL;
 		}
 		CloseHandle(fileHandle);
-		return TRUE;
+		return 0;
 	}
 	if (pfnCryptCATAdminAcquireContext2 && pfnCryptCATAdminCalcHashFromFileHandle2)
 	{
@@ -433,7 +429,7 @@ BOOL WINAPI VerifyPEFile(
 				stateData = NULL;
 			}
 			CloseHandle(fileHandle);
-			return TRUE;
+			return 0;
 		}
 	}
 	winTrustRes = TRUST_E_NOSIGNATURE;
@@ -449,10 +445,10 @@ BOOL WINAPI VerifyPEFile(
 			stateData = NULL;
 		}
 		CloseHandle(fileHandle);
-		return TRUE;
+		return 0;
 	}
 	CloseHandle(fileHandle);
-	return FALSE;
+	return -2;
 }
 
 VOID WINAPI FreeCertInfo(PCCERT_CONTEXT *Signatures, DWORD SignatureCount)
@@ -461,5 +457,6 @@ VOID WINAPI FreeCertInfo(PCCERT_CONTEXT *Signatures, DWORD SignatureCount)
 	{
 		CertFreeCertificateContext(Signatures[i]);
 	}
+	HeapFree(GetProcessHeap(), 0, (LPVOID)Signatures);
 }
 
